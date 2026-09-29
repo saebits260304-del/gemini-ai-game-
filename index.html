@@ -1,0 +1,1676 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ULTIMATE TANK WARS - 2D TOP-DOWN</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+KR:wght@400;700;900&display=swap');
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #0d0f12;
+            color: #f3f4f6;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111827;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 3px;
+        }
+
+        canvas {
+            display: block;
+            background-color: #050505;
+        }
+
+        .modal-bg {
+            background: rgba(10, 12, 16, 0.88);
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden bg-black text-white">
+
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas" class="w-full h-full absolute inset-0 z-0"></canvas>
+
+    <!-- Top In-Game HUD -->
+    <div id="inGameHUD" class="hidden absolute top-0 left-0 w-full p-4 pointer-events-none z-10 flex justify-between items-start">
+        <!-- Player Stats Bar -->
+        <div class="w-72 bg-gray-900/90 backdrop-blur border border-gray-700 rounded-xl p-3 shadow-2xl pointer-events-auto">
+            <div class="flex justify-between items-center mb-1">
+                <span id="hudPlayerName" class="font-bold text-yellow-400 text-sm">Tanker</span>
+                <span id="hudTankName" class="text-xs text-gray-400">K2 흑표</span>
+            </div>
+            
+            <!-- Health Bar -->
+            <div class="w-full bg-gray-800 h-3 rounded-full overflow-hidden border border-gray-600 mb-1">
+                <div id="hudHpBar" class="bg-gradient-to-r from-red-600 to-green-500 h-full transition-all duration-200" style="width: 100%;"></div>
+            </div>
+            <div class="flex justify-between text-[10px] text-gray-300 mb-2">
+                <span>HP</span>
+                <span id="hudHpText">1000 / 1000</span>
+            </div>
+
+            <!-- EXP Bar -->
+            <div class="w-full bg-gray-800 h-2 rounded-full overflow-hidden border border-gray-600 mb-1">
+                <div id="hudExpBar" class="bg-gradient-to-r from-blue-600 to-cyan-400 h-full transition-all duration-200" style="width: 0%;"></div>
+            </div>
+            <div class="flex justify-between items-center">
+                <div class="text-[11px] text-cyan-300 font-semibold">
+                    EXP: <span id="hudExpText">0</span> / <span id="hudMaxExpText">100</span>
+                </div>
+                <div class="bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 text-xs px-2 py-0.5 rounded-full font-bold">
+                    Lv. <span id="hudLevelText" class="text-yellow-300 font-orbitron">1</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mode & Timer Display -->
+        <div class="flex flex-col items-center">
+            <div class="bg-gray-900/90 border border-gray-700 px-6 py-2 rounded-2xl shadow-xl backdrop-blur text-center">
+                <div id="hudModeTitle" class="text-xs text-gray-400 font-bold tracking-widest uppercase">1 v 1 MATCH</div>
+                <div id="hudTimer" class="text-2xl font-black font-orbitron text-yellow-400">01:00</div>
+            </div>
+            <div id="hudObjectiveText" class="text-xs text-gray-300 mt-1 bg-black/60 px-3 py-1 rounded-full border border-gray-800">
+                [ENTER] 대기실 복귀
+            </div>
+        </div>
+
+        <!-- Leaderboard & MiniMap -->
+        <div class="flex gap-3 pointer-events-auto">
+            <div class="bg-gray-900/90 border border-gray-700 p-3 rounded-xl w-44 backdrop-blur text-xs">
+                <div class="font-bold border-b border-gray-700 pb-1 mb-2 text-cyan-400 flex justify-between">
+                    <span>점수판</span>
+                    <span id="hudKills">0 Kills</span>
+                </div>
+                <div id="hudScoreList" class="space-y-1 text-[11px] text-gray-300 max-h-24 overflow-y-auto">
+                </div>
+            </div>
+
+            <div class="relative w-32 h-32 bg-black/80 border-2 border-gray-700 rounded-xl overflow-hidden shadow-2xl">
+                <canvas id="miniMapCanvas" class="w-full h-full"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN LOBBY OVERLAY -->
+    <div id="lobbyOverlay" class="absolute inset-0 z-20 flex flex-col justify-between p-6 modal-bg">
+        <!-- Lobby Top Nav -->
+        <div class="flex justify-between items-center w-full">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-yellow-500/20 border border-yellow-500 rounded-xl flex items-center justify-center text-yellow-400 font-bold text-xl">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <div>
+                    <div id="lobbyNick" class="font-bold text-lg text-white">사령관</div>
+                    <div class="text-xs text-gray-400 flex items-center gap-3">
+                        <span><i class="fa-solid fa-coins text-yellow-400"></i> 코인: <span id="lobbyCoins" class="text-yellow-300 font-bold">100</span></span>
+                        <span><i class="fa-solid fa-skull text-red-400"></i> 누적 킬: <span id="lobbyKills" class="text-red-300 font-bold">0</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button onclick="openShop()" class="bg-gradient-to-r from-yellow-600 to-amber-500 hover:from-yellow-500 hover:to-amber-400 text-black font-bold px-4 py-2 rounded-xl border border-yellow-300 transition shadow-lg flex items-center gap-2">
+                    <i class="fa-solid fa-store"></i> 상점 & 보급
+                </button>
+                <button onclick="openSettings()" class="bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 px-4 py-2 rounded-xl transition flex items-center gap-2">
+                    <i class="fa-solid fa-gear"></i> 설정 / 비밀코드
+                </button>
+                <button onclick="logout()" class="bg-red-900/50 hover:bg-red-800 border border-red-600 text-red-300 px-3 py-2 rounded-xl transition text-xs">
+                    로그아웃
+                </button>
+            </div>
+        </div>
+
+        <!-- Lobby Center Screen -->
+        <div class="grid grid-cols-12 gap-6 my-auto max-w-7xl mx-auto w-full">
+            <!-- Tank Selector Column -->
+            <div class="col-span-8 bg-gray-900/80 border border-gray-800 rounded-2xl p-5 flex flex-col justify-between backdrop-blur">
+                <div>
+                    <div class="flex justify-between items-center mb-3 border-b border-gray-800 pb-2">
+                        <h2 class="text-xl font-black text-yellow-400 font-orbitron flex items-center gap-2">
+                            <i class="fa-solid fa-tank"></i> 주력 전차 선택 (15종 + Secret)
+                        </h2>
+                        <span id="selectedTankType" class="text-xs bg-gray-800 border border-gray-700 px-3 py-1 rounded-full text-cyan-400 font-bold">
+                            K2 흑표
+                        </span>
+                    </div>
+
+                    <!-- Tank Grid -->
+                    <div id="tankGrid" class="grid grid-cols-5 gap-2.5 max-h-[300px] overflow-y-auto p-1"></div>
+                </div>
+
+                <!-- Selected Tank Stats & Info -->
+                <div id="selectedTankInfo" class="mt-4 bg-black/60 border border-gray-800 p-4 rounded-xl flex gap-4 items-center">
+                    <div class="w-16 h-16 bg-gray-800 rounded-lg flex items-center justify-center border border-gray-700 text-3xl text-yellow-400">
+                        <i id="tankInfoIcon" class="fa-solid fa-shield-cat"></i>
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex justify-between items-center">
+                            <h3 id="tankInfoName" class="font-bold text-lg text-white">K2 흑표</h3>
+                            <span id="tankInfoTag" class="text-[11px] text-yellow-400 font-semibold bg-yellow-950/60 border border-yellow-700/50 px-2 py-0.5 rounded">
+                                "자동장전과 언덕 장악의 끝판왕"
+                            </span>
+                        </div>
+                        <p id="tankInfoDesc" class="text-xs text-gray-400 mt-1 line-clamp-2">
+                            숙련도 영향 없는 5초 자동장전 및 탑티어급 기동성.
+                        </p>
+                        <div class="grid grid-cols-4 gap-2 mt-2 text-[11px]">
+                            <div class="bg-gray-900 p-1.5 rounded border border-gray-800 text-center">공격력: <b id="statAtk" class="text-red-400">85</b></div>
+                            <div class="bg-gray-900 p-1.5 rounded border border-gray-800 text-center">체력: <b id="statHp" class="text-green-400">1000</b></div>
+                            <div class="bg-gray-900 p-1.5 rounded border border-gray-800 text-center">속도: <b id="statSpd" class="text-blue-400">4.8</b></div>
+                            <div class="bg-gray-900 p-1.5 rounded border border-gray-800 text-center">장전속도: <b id="statReload" class="text-yellow-400">1.0s</b></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game Mode & Start Column -->
+            <div class="col-span-4 bg-gray-900/80 border border-gray-800 rounded-2xl p-5 flex flex-col justify-between backdrop-blur">
+                <div>
+                    <h2 class="text-xl font-black text-cyan-400 font-orbitron mb-3 border-b border-gray-800 pb-2">
+                        <i class="fa-solid fa-gamepad"></i> 매치 설정
+                    </h2>
+
+                    <div class="space-y-2 mb-4">
+                        <label class="text-xs text-gray-400">팀 인원 설정</label>
+                        <div class="grid grid-cols-5 gap-1">
+                            <button onclick="setTeamMode('1v1')" class="team-btn bg-yellow-500 text-black font-bold py-1.5 text-xs rounded border border-yellow-400">1:1</button>
+                            <button onclick="setTeamMode('2v2')" class="team-btn bg-gray-800 text-gray-300 hover:bg-gray-700 py-1.5 text-xs rounded border border-gray-700">2:2</button>
+                            <button onclick="setTeamMode('3v3')" class="team-btn bg-gray-800 text-gray-300 hover:bg-gray-700 py-1.5 text-xs rounded border border-gray-700">3:3</button>
+                            <button onclick="setTeamMode('4v4')" class="team-btn bg-gray-800 text-gray-300 hover:bg-gray-700 py-1.5 text-xs rounded border border-gray-700">4:4</button>
+                            <button onclick="setTeamMode('5v5')" class="team-btn bg-gray-800 text-gray-300 hover:bg-gray-700 py-1.5 text-xs rounded border border-gray-700">5:5</button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2 mb-4">
+                        <label class="text-xs text-gray-400">특수 모드</label>
+                        <select id="gameModeSelect" class="w-full bg-gray-800 border border-gray-700 rounded-xl p-2.5 text-xs text-gray-200 focus:outline-none focus:border-cyan-500">
+                            <option value="timed">⏱️ 제한시간 모드 (1분 팀 데스매치)</option>
+                            <option value="endless">♾️ 무제한 모드 (끝없는 데스매치)</option>
+                            <option value="koth">👑 거점 점령전 (5분 사수전)</option>
+                            <option value="ctf">🚩 깃발 뺏기 모드 (Capture the Flag)</option>
+                            <option value="mega">🔥 MeGa 모드 (50인 개인전 난투)</option>
+                            <option value="transform">⚡ 변신 & 최후의 생존자 모드</option>
+                        </select>
+                    </div>
+
+                    <div class="bg-black/50 border border-gray-800 p-3 rounded-xl text-xs space-y-1 text-gray-400">
+                        <div class="font-bold text-gray-200 mb-1 border-b border-gray-800 pb-0.5">🎮 조작법 안내</div>
+                        <div>• 이동: <span class="text-yellow-400 font-mono">W, A, S, D</span></div>
+                        <div>• 방향 사격: <span class="text-yellow-400 font-mono">I(위), J(좌), K(아래), L(우)</span></div>
+                        <div>• 마우스 조준 & <span class="text-yellow-400 font-mono">클릭 / Space</span></div>
+                        <div>• <span class="text-cyan-400 font-mono">Enter</span>: 게임 시작 및 로비 복귀</div>
+                    </div>
+                </div>
+
+                <button onclick="startGame()" class="w-full mt-4 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-black font-black text-xl py-4 rounded-xl shadow-xl transition transform active:scale-95 border-2 border-green-300 flex items-center justify-center gap-2 font-orbitron">
+                    <i class="fa-solid fa-play"></i> GAME START (ENTER)
+                </button>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center w-full max-w-7xl mx-auto text-xs text-gray-500">
+            <div>Tank Wars v2.5 • 2D Tactical Battle Sandbox</div>
+            <button onclick="openLeaderboard()" class="text-gray-400 hover:text-white underline">명예의 전당 (랭킹)</button>
+        </div>
+    </div>
+
+    <!-- ACCOUNT LOGIN MODAL -->
+    <div id="accountModal" class="fixed inset-0 z-50 flex items-center justify-center modal-bg">
+        <div class="bg-gray-900 border border-gray-700 p-8 rounded-2xl w-96 shadow-2xl relative">
+            <h2 class="text-2xl font-black text-center text-yellow-400 font-orbitron mb-2">TANK WARS LOGIN</h2>
+            <p class="text-xs text-gray-400 text-center mb-6">계정을 로그인하거나 생성을 통해 데이터를 저장하세요.</p>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs text-gray-300 block mb-1">닉네임</label>
+                    <input type="text" id="accNickname" placeholder="닉네임 입력" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500">
+                </div>
+                <div>
+                    <label class="text-xs text-gray-300 block mb-1">비밀번호</label>
+                    <input type="password" id="accPassword" placeholder="비밀번호 입력" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-yellow-500">
+                </div>
+
+                <div id="accMsg" class="text-xs text-red-400 font-bold text-center hidden"></div>
+
+                <div class="flex gap-3 pt-2">
+                    <button onclick="handleLogin()" class="flex-1 bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-2.5 rounded-xl transition">
+                        로그인
+                    </button>
+                    <button onclick="handleRegister()" class="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 font-bold py-2.5 rounded-xl transition">
+                        계정 생성
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SETTINGS & SECRET CODE MODAL -->
+    <div id="settingsModal" class="hidden fixed inset-0 z-40 flex items-center justify-center modal-bg">
+        <div class="bg-gray-900 border border-gray-700 p-6 rounded-2xl w-[450px] shadow-2xl relative">
+            <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-2">
+                <h3 class="text-lg font-bold text-white"><i class="fa-solid fa-code"></i> 설정 및 시크릿 코드</h3>
+                <button onclick="closeSettings()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <!-- Cheat Code Input -->
+            <div class="mb-6">
+                <label class="text-xs text-yellow-400 font-bold block mb-1">비밀 시크릿 코드 입력</label>
+                <div class="flex gap-2">
+                    <input type="text" id="cheatCodeInput" placeholder="시크릿 코드 입력" class="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-white uppercase focus:outline-none focus:border-yellow-500">
+                    <button onclick="applyCheatCode()" class="bg-yellow-500 hover:bg-yellow-400 text-black font-bold px-4 py-2 rounded-xl text-xs transition">
+                        적용
+                    </button>
+                </div>
+                <div id="codeResultMsg" class="text-xs mt-2 hidden"></div>
+            </div>
+
+            <!-- Stats Upgrade System -->
+            <div class="space-y-3 border-t border-gray-800 pt-4">
+                <h4 class="text-xs text-gray-400 font-bold uppercase">영구 스탯 강화</h4>
+                <div class="flex justify-between items-center bg-black/40 p-2.5 rounded-xl border border-gray-800 text-xs">
+                    <span>공격력 업그레이드 (+5 Atk)</span>
+                    <button onclick="upgradeStat('atk')" class="bg-gray-800 hover:bg-gray-700 border border-gray-600 px-3 py-1 rounded text-yellow-400 font-bold">100 코인</button>
+                </div>
+                <div class="flex justify-between items-center bg-black/40 p-2.5 rounded-xl border border-gray-800 text-xs">
+                    <span>체력 업그레이드 (+100 HP)</span>
+                    <button onclick="upgradeStat('hp')" class="bg-gray-800 hover:bg-gray-700 border border-gray-600 px-3 py-1 rounded text-yellow-400 font-bold">100 코인</button>
+                </div>
+                <div class="flex justify-between items-center bg-black/40 p-2.5 rounded-xl border border-gray-800 text-xs">
+                    <span>이동 속도 업그레이드 (+0.2 Speed)</span>
+                    <button onclick="upgradeStat('speed')" class="bg-gray-800 hover:bg-gray-700 border border-gray-600 px-3 py-1 rounded text-yellow-400 font-bold">150 코인</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SHOP MODAL -->
+    <div id="shopModal" class="hidden fixed inset-0 z-40 flex items-center justify-center modal-bg">
+        <div class="bg-gray-900 border border-gray-700 p-6 rounded-2xl w-[750px] max-h-[85vh] overflow-y-auto shadow-2xl relative">
+            <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-3">
+                <h3 class="text-xl font-bold text-yellow-400 flex items-center gap-2 font-orbitron">
+                    <i class="fa-solid fa-store text-2xl"></i> 특수 보급 상점 & 커스텀 스킨
+                </h3>
+                <button onclick="closeShop()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+
+            <div class="flex gap-2 mb-4 border-b border-gray-800 pb-2 text-xs">
+                <button id="shopTabSkinsBtn" onclick="switchShopTab('skins')" class="px-4 py-2 bg-yellow-500 text-black font-bold rounded-lg transition">🎨 탱크 스킨</button>
+                <button id="shopTabBulletsBtn" onclick="switchShopTab('bullets')" class="px-4 py-2 bg-gray-800 text-gray-300 hover:bg-gray-700 rounded-lg transition">🔥 총알 스킨</button>
+                <button id="shopTabGachaBtn" onclick="switchShopTab('gacha')" class="px-4 py-2 bg-gray-800 text-gray-300 hover:bg-gray-700 rounded-lg transition">📦 보급 상자 & 시크릿</button>
+            </div>
+
+            <div id="shopTabSkins" class="space-y-3">
+                <div id="tankSkinGrid" class="grid grid-cols-2 gap-3"></div>
+            </div>
+
+            <div id="shopTabBullets" class="hidden space-y-3">
+                <div id="bulletSkinGrid" class="grid grid-cols-2 gap-3"></div>
+            </div>
+
+            <div id="shopTabGacha" class="hidden grid grid-cols-2 gap-4">
+                <div class="bg-gray-800/60 border border-yellow-500/30 p-5 rounded-xl text-center flex flex-col justify-between">
+                    <div>
+                        <div class="text-5xl text-yellow-400 my-3"><i class="fa-solid fa-box-open"></i></div>
+                        <div class="font-bold text-white text-base">랜덤 보급 상자</div>
+                        <div class="text-xs text-gray-400 mt-2">15종의 주력 전차 중 1종을 랜덤 획득합니다.</div>
+                        <div class="text-xs text-yellow-300 font-bold mt-1">보유 상자: <span id="chestCount" class="text-lg">0</span>개</div>
+                    </div>
+                    <button onclick="openChest()" class="mt-4 bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-black font-black py-2.5 rounded-xl text-xs shadow-lg transition">
+                        상자 뽑기 (200 코인)
+                    </button>
+                </div>
+
+                <div class="bg-gray-800/60 border border-red-500/30 p-5 rounded-xl text-center flex flex-col justify-between">
+                    <div>
+                        <div class="text-5xl text-red-400 my-3"><i class="fa-solid fa-user-ninja"></i></div>
+                        <div class="font-bold text-red-400 text-base font-orbitron">SECRET ACCESS</div>
+                        <div class="text-xs text-gray-400 mt-2">시크릿 어드민 코드를 입력하여 360도 전방위 연사 전차 2종을 해금하세요.</div>
+                    </div>
+                    <div class="mt-3 space-y-2">
+                        <input type="text" id="shopCheatCodeInput" placeholder="시크릿 코드 입력" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white text-center uppercase focus:outline-none focus:border-red-500">
+                        <button onclick="applyShopCheatCode()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-2 rounded-xl text-xs transition">
+                            코드 검증 및 해금
+                        </button>
+                        <div id="shopCodeMsg" class="text-[11px] hidden font-semibold"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LEADERBOARD MODAL -->
+    <div id="leaderboardModal" class="hidden fixed inset-0 z-40 flex items-center justify-center modal-bg">
+        <div class="bg-gray-900 border border-gray-700 p-6 rounded-2xl w-96 shadow-2xl relative">
+            <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-2">
+                <h3 class="text-lg font-bold text-yellow-400"><i class="fa-solid fa-trophy"></i> 명예의 전당 (실시간 공유 랭킹)</h3>
+                <button onclick="closeLeaderboard()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div id="leaderboardList" class="space-y-2 text-sm max-h-[350px] overflow-y-auto pr-1"></div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK Imports & Real-time Shared Leaderboard Logic -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'tank-wars-app';
+        let db = null;
+        let auth = null;
+        let currentUserAuth = null;
+        window.globalLeaderboardData = [];
+
+        async function initFirebase() {
+            try {
+                if (typeof __firebase_config !== 'undefined') {
+                    const firebaseConfig = JSON.parse(__firebase_config);
+                    const app = initializeApp(firebaseConfig);
+                    auth = getAuth(app);
+                    db = getFirestore(app);
+
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        const userCred = await signInWithCustomToken(auth, __initial_auth_token);
+                        currentUserAuth = userCred.user;
+                    } else {
+                        const userCred = await signInAnonymously(auth);
+                        currentUserAuth = userCred.user;
+                    }
+
+                    // Subscribe to global real-time leaderboard
+                    const leaderboardCol = collection(db, 'artifacts', appId, 'public', 'data', 'leaderboard');
+                    onSnapshot(leaderboardCol, (snapshot) => {
+                        const list = [];
+                        snapshot.forEach(doc => {
+                            list.push(doc.data());
+                        });
+                        // Sort by kills descending
+                        list.sort((a, b) => (b.kills || 0) - (a.kills || 0));
+                        window.globalLeaderboardData = list;
+                        if (typeof window.updateLeaderboardUI === 'function') {
+                            window.updateLeaderboardUI();
+                        }
+                    }, (err) => {
+                        console.error("Leaderboard snapshot error:", err);
+                    });
+                }
+            } catch (err) {
+                console.warn("Firebase fallback active:", err);
+            }
+        }
+
+        window.saveLeaderboardScore = async function(nickname, kills) {
+            if (!db || !currentUserAuth || !nickname) return;
+            try {
+                const userDoc = doc(db, 'artifacts', appId, 'public', 'data', 'leaderboard', nickname);
+                await setDoc(userDoc, {
+                    nickname: nickname,
+                    kills: kills,
+                    updatedAt: Date.now()
+                }, { merge: true });
+            } catch (err) {
+                console.error("Error updating leaderboard score:", err);
+            }
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initFirebase();
+        });
+    </script>
+
+    <script>
+        // Canvas & Rendering Contexts
+        let canvas, ctx, miniCanvas, miniCtx;
+
+        // Tank Database (15 Standard Tanks + Secret Admin Tanks)
+        const TANK_DATABASE = [
+            { id: 'k2', name: 'K2 흑표', tag: '자동장전과 언덕 장악의 끝판왕', desc: '숙련도 영향 없는 5초 자동장전 및 탑티어급 기동성.', atk: 85, hp: 1000, speed: 4.8, reload: 1.0, icon: 'fa-shield-halved' },
+            { id: 'm1a2', name: 'M1A2 에이브람스', tag: '압도적인 장갑과 화력', desc: '열화우라늄 장갑과 강력한 120mm 활강포를 갖춘 주력 전차.', atk: 90, hp: 1100, speed: 4.5, reload: 1.2, icon: 'fa-shield' },
+            { id: 'leopard2', name: '레오파르트 2A7', tag: '독일 명품 공수양면', desc: '뛰어난 명중률과 완벽한 기동 성능을 조합한 전차.', atk: 88, hp: 1050, speed: 4.6, reload: 1.1, icon: 'fa-crosshairs' },
+            { id: 't90', name: 'T-90M', tag: '반응장갑과 강력한 한방', desc: '낮은 차체와 반응장갑으로 생존성이 우수함.', atk: 95, hp: 950, speed: 4.3, reload: 1.3, icon: 'fa-bomb' },
+            { id: 'challenger2', name: '챌린저 2', tag: '철벽의 방어력', desc: '최강의 도체스터 장갑으로 뛰어난 내구성을 자랑.', atk: 80, hp: 1300, speed: 4.0, reload: 1.4, icon: 'fa-square' },
+            { id: 'type10', name: '10식 전차', tag: '경량화와 고속 기동', desc: '빠른 후진과 민첩한 기동력을 갖춘 경량 주력 전차.', atk: 82, hp: 900, speed: 5.2, reload: 0.9, icon: 'fa-bolt' },
+            { id: 'merkava', name: '메르카바 Mk4', tag: '전면 엔진의 위엄', desc: '생존성을 극대화하고 강력한 보호막을 지닌 전차.', atk: 86, hp: 1150, speed: 4.2, reload: 1.2, icon: 'fa-person-military-rifle' },
+            { id: 'leclerc', name: '르클레르', tag: '프랑스 고성능 자동장전', desc: '초고속 기동과 가속도를 갖춘 기계화 전차.', atk: 84, hp: 980, speed: 5.0, reload: 0.8, icon: 'fa-gauge-high' },
+            { id: 'vt4', name: 'VT-4', tag: '다목적 현대 전차', desc: '균형 잡힌 스탯과 우수한 사격 통제 장치.', atk: 83, hp: 1000, speed: 4.5, reload: 1.1, icon: 'fa-star' },
+            { id: 'altay', name: '알타이', tag: '최신 복합 장갑', desc: '우수한 사격 정밀도와 강화된 기동성.', atk: 87, hp: 1020, speed: 4.6, reload: 1.15, icon: 'fa-gem' },
+            { id: 'c1ariete', name: 'C1 아리에테', tag: '경쾌한 화력 지원', desc: '빠른 기동과 원거리 화력 지원 전차.', atk: 81, hp: 920, speed: 4.9, reload: 1.0, icon: 'fa-plane' },
+            { id: 'k1a2', name: 'K1A2', tag: '한국군의 든든한 국방', desc: '한국 지형에 최적화된 우수한 기동 전차.', atk: 84, hp: 1020, speed: 4.7, reload: 1.05, icon: 'fa-flag' },
+            { id: 't14', name: 'T-14 아르마타', tag: '무인 포탑 신개념 전차', desc: '무인 포탑과 최첨단 방어 시스템 도입.', atk: 92, hp: 1080, speed: 4.7, reload: 1.1, icon: 'fa-robot' },
+            { id: 'strv122', name: 'Strv 122', tag: '북유럽의 수호자', desc: '추가 장갑 부착으로 향상된 방어력.', atk: 86, hp: 1180, speed: 4.4, reload: 1.2, icon: 'fa-snowflake' },
+            { id: 'paladin', name: 'M109 팔라딘', tag: '장거리 곡사포 지원', desc: '강력한 한방 화력을 자랑하는 자주포형 전차.', atk: 110, hp: 850, speed: 3.8, reload: 1.8, icon: 'fa-bullseye' },
+            { id: 'admin1', name: '👑 ADMIN OVERLORD 1', tag: '360도 16방향 초고속 연사', desc: '어드민 전용 360도 16방향 마구 발사 전차.', atk: 120, hp: 3000, speed: 6.0, reload: 0.1, icon: 'fa-crown', secret: true, admin: 1, color: '#eab308' },
+            { id: 'admin2', name: '👑 ADMIN OVERLORD 2', tag: '360도 세모 탄막 탄환', desc: '어드민 전용 360도 12방향 세모 탄막 발사 전차.', atk: 150, hp: 3500, speed: 6.5, reload: 0.1, icon: 'fa-skull-crossbones', secret: true, admin: 2, color: '#ec4899' }
+        ];
+
+        // Skins Database
+        const TANK_SKINS = [
+            { id: 'default', name: '기본 스킨', cost: 0, color: null },
+            { id: 'gold', name: '황금 전차', cost: 500, color: '#facc15', stroke: '#ef4444' },
+            { id: 'cyber', name: '네온 사이버', cost: 800, color: '#06b6d4', stroke: '#ec4899' },
+            { id: 'camo', name: '밀리터리 카모', cost: 300, color: '#15803d', stroke: '#fef08a' }
+        ];
+
+        const BULLET_SKINS = [
+            { id: 'normal', name: '일반 포탄', desc: '표준 노란색 탄환', cost: 0 },
+            { id: 'fire', name: '화염 포탄', desc: '붉은 이펙트의 화염 탄환', cost: 300 },
+            { id: 'water', name: '플라즈마 포탄', desc: '푸른 빛의 플라즈마 탄환', cost: 400 },
+            { id: 'laser', name: '레이저 포탄', desc: '핑크빛 레이저 탄환', cost: 500 },
+            { id: 'gold', name: '황금 포탄', desc: '눈부신 황금빛 탄환', cost: 600 }
+        ];
+
+        // In-memory accounts database
+        const accountsDB = [
+            { nickname: '사령관', password: '123', coins: 1200, kills: 120, chests: 2, upgrades: { atk: 10, hp: 200, speed: 0.4 } },
+            { nickname: 'K2_Master', password: '123', coins: 800, kills: 95, chests: 1, upgrades: { atk: 5, hp: 100, speed: 0.2 } },
+            { nickname: 'TankKing', password: '123', coins: 500, kills: 80, chests: 0, upgrades: { atk: 0, hp: 0, speed: 0 } },
+            { nickname: '철벽의방어', password: '123', coins: 350, kills: 42, chests: 0, upgrades: { atk: 0, hp: 0, speed: 0 } },
+            { nickname: '포탄폭격기', password: '123', coins: 200, kills: 28, chests: 0, upgrades: { atk: 0, hp: 0, speed: 0 } }
+        ];
+
+        // Global State Variables
+        let currentUser = null;
+        let selectedTankId = 'k2';
+        let selectedTeamMode = '1v1';
+        let unlockedSecretAdmin = false;
+        let equippedTankSkin = 'default';
+        let unlockedTankSkins = ['default'];
+        let bulletSkin = 'normal';
+        let unlockedBulletSkins = ['normal'];
+
+        let gameActive = false;
+        let gameMode = 'timed'; // timed, endless, koth, ctf, mega, transform
+        let mapWidth = 3000;
+        let mapHeight = 3000;
+        let mapObstacles = [];
+        let tanks = [];
+        let bullets = [];
+        let hexagons = [];
+        let playerTank = null;
+        let gameTimer = 60;
+        let gameTimerInterval = null;
+        let coinDropInterval = null;
+
+        const keys = {};
+        let mouseX = 0;
+        let mouseY = 0;
+
+        class Obstacle {
+            constructor(x, y, w, h, passable) {
+                this.x = x;
+                this.y = y;
+                this.w = w;
+                this.h = h;
+                this.passable = passable; // true = enterable cover (5), false = solid wall (15)
+            }
+
+            draw(cameraX, cameraY) {
+                let rx = this.x - cameraX;
+                let ry = this.y - cameraY;
+
+                if (this.passable) {
+                    // Enterable Building / Canopy
+                    ctx.fillStyle = 'rgba(31, 41, 55, 0.7)';
+                    ctx.fillRect(rx, ry, this.w, this.h);
+                    ctx.strokeStyle = '#374151';
+                    ctx.lineWidth = 3;
+                    ctx.strokeRect(rx, ry, this.w, this.h);
+
+                    ctx.fillStyle = '#6b7280';
+                    ctx.font = '10px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('BUILDING COVER', rx + this.w / 2, ry + this.h / 2);
+                } else {
+                    // Impassable Solid Obstacle
+                    ctx.fillStyle = '#111827';
+                    ctx.fillRect(rx, ry, this.w, this.h);
+                    ctx.strokeStyle = '#ef4444';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(rx, ry, this.w, this.h);
+
+                    // X pattern for solid wall
+                    ctx.beginPath();
+                    ctx.moveTo(rx, ry);
+                    ctx.lineTo(rx + this.w, ry + this.h);
+                    ctx.moveTo(rx + this.w, ry);
+                    ctx.lineTo(rx, ry + this.h);
+                    ctx.strokeStyle = '#1f2937';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                }
+            }
+        }
+
+        class Hexagon {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.size = 20;
+                this.hp = 30;
+                this.maxHp = 30;
+                this.isDead = false;
+            }
+
+            draw(cameraX, cameraY) {
+                if (this.isDead) return;
+                let rx = this.x - cameraX;
+                let ry = this.y - cameraY;
+
+                ctx.save();
+                ctx.translate(rx, ry);
+
+                ctx.fillStyle = '#3b82f6';
+                ctx.strokeStyle = '#60a5fa';
+                ctx.lineWidth = 2;
+
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    let angle = (Math.PI / 3) * i;
+                    let hx = this.size * Math.cos(angle);
+                    let hy = this.size * Math.sin(angle);
+                    if (i === 0) ctx.moveTo(hx, hy);
+                    else ctx.lineTo(hx, hy);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.restore();
+            }
+        }
+
+        class Bullet {
+            constructor(x, y, angle, damage, owner, isTriangle = false, customSpeed = null) {
+                this.x = x;
+                this.y = y;
+                this.angle = angle;
+                this.damage = damage;
+                this.owner = owner;
+                this.isTriangle = isTriangle;
+                // 세모 탄환 이동 속도 및 사거리 대폭 증가
+                this.speed = customSpeed !== null ? customSpeed : (isTriangle ? 20 : 12);
+                this.radius = isTriangle ? 14 : 5;
+                this.isDead = false;
+                this.distanceTraveled = 0;
+                this.maxDistance = isTriangle ? 600 : 1500; // 세모 탄환 비행 거리 확대 (600px)
+                this.hp = isTriangle ? 5 : 1; // 세모 탄환 내구도 5
+                this.isStopped = false; // 도달 후 정지 상태 여부
+                this.createdAt = Date.now(); // 탄환 생성 시각 기록
+            }
+
+            update() {
+                if (this.isDead) return;
+
+                // 생성 후 10초(10,000ms) 경과 시 즉시 소멸
+                if (Date.now() - this.createdAt >= 10000) {
+                    this.isDead = true;
+                    return;
+                }
+
+                // 세모 탄환이 목표 지점에 도달하여 정지한 경우
+                if (this.isTriangle && this.isStopped) {
+                    return;
+                }
+
+                let dx = Math.cos(this.angle) * this.speed;
+                let dy = Math.sin(this.angle) * this.speed;
+
+                this.x += dx;
+                this.y += dy;
+                this.distanceTraveled += this.speed;
+
+                if (this.distanceTraveled >= this.maxDistance) {
+                    if (this.isTriangle) {
+                        this.isStopped = true; // 세모 탄환은 안 사라지고 멈춤
+                    } else {
+                        this.isDead = true;
+                    }
+                }
+
+                // Check Map Boundaries
+                if (this.x < 0 || this.x > mapWidth || this.y < 0 || this.y > mapHeight) {
+                    this.isDead = true;
+                }
+
+                // Check Impassable Wall Collisions
+                for (let ob of mapObstacles) {
+                    if (!ob.passable && this.x > ob.x && this.x < ob.x + ob.w && this.y > ob.y && this.y < ob.y + ob.h) {
+                        if (this.isTriangle) {
+                            this.isStopped = true; // 벽에 부딪히면 그 위치에 멈춤
+                        } else {
+                            this.isDead = true;
+                        }
+                        break;
+                    }
+                }
+            }
+
+            draw(cameraX, cameraY) {
+                if (this.isDead) return;
+                let rx = this.x - cameraX;
+                let ry = this.y - cameraY;
+
+                ctx.save();
+                ctx.translate(rx, ry);
+                ctx.rotate(this.angle);
+
+                if (this.isTriangle) {
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.strokeStyle = '#ef4444';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(15, 0);
+                    ctx.lineTo(-10, -10);
+                    ctx.lineTo(-10, 10);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                } else {
+                    if (bulletSkin === 'fire') {
+                        ctx.fillStyle = '#ef4444';
+                        ctx.shadowColor = '#f97316';
+                        ctx.shadowBlur = 10;
+                    } else if (bulletSkin === 'water') {
+                        ctx.fillStyle = '#06b6d4';
+                        ctx.shadowColor = '#3b82f6';
+                        ctx.shadowBlur = 10;
+                    } else if (bulletSkin === 'laser') {
+                        ctx.fillStyle = '#ec4899';
+                        ctx.shadowColor = '#f43f5e';
+                        ctx.shadowBlur = 12;
+                    } else if (bulletSkin === 'gold') {
+                        ctx.fillStyle = '#facc15';
+                        ctx.shadowColor = '#eab308';
+                        ctx.shadowBlur = 10;
+                    } else {
+                        ctx.fillStyle = '#facc15';
+                    }
+
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
+        }
+
+        class Tank {
+            constructor(id, name, x, y, team, isPlayer = false, config = null, level = 1) {
+                this.id = id;
+                this.name = name;
+                this.x = x;
+                this.y = y;
+                this.team = team;
+                this.isPlayer = isPlayer;
+                this.config = config || TANK_DATABASE.find(t => t.id === id) || TANK_DATABASE[0];
+
+                this.level = level;
+                this.exp = 0;
+                this.maxExp = this.level * 100;
+
+                this.maxHp = this.config.hp + (this.isPlayer && currentUser ? currentUser.upgrades.hp : 0);
+                this.hp = this.maxHp;
+                this.atk = this.config.atk + (this.isPlayer && currentUser ? currentUser.upgrades.atk : 0);
+                this.speed = this.config.speed + (this.isPlayer && currentUser ? currentUser.upgrades.speed : 0);
+                this.reloadTime = this.config.reload;
+
+                this.angle = 0;
+                this.turretAngle = 0;
+                this.lastShotTime = 0;
+                this.kills = 0;
+                this.isDead = false;
+            }
+
+            // Level-based Size Scaling (1 -> 60+)
+            getSize() {
+                let baseSize = 20;
+                let scale = Math.min(60, this.level);
+                return baseSize + (scale - 1) * 0.4;
+            }
+
+            gainExp(amount) {
+                this.exp += amount;
+                while (this.exp >= this.maxExp) {
+                    this.exp -= this.maxExp;
+                    this.level++;
+                    this.maxExp = this.level * 100;
+                    this.maxHp += 50;
+                    this.hp = Math.min(this.maxHp, this.hp + 100);
+                    this.atk += 5;
+                }
+                if (this.isPlayer) updateHUD();
+            }
+
+            shoot(targetAngle = null) {
+                let now = Date.now();
+                if (now - this.lastShotTime < this.reloadTime * 1000) return;
+                this.lastShotTime = now;
+
+                let fireAngle = targetAngle !== null ? targetAngle : this.turretAngle;
+
+                if (this.config.admin === 1) {
+                    // ADMIN 1: 360도 16방향 발사 (속도 14로 대폭 향상)
+                    for (let i = 0; i < 16; i++) {
+                        let a = (Math.PI * 2 / 16) * i;
+                        bullets.push(new Bullet(this.x, this.y, a, this.atk, this, false, 14));
+                    }
+                } else if (this.config.admin === 2) {
+                    // ADMIN 2: 360도 초고속 삼각형 탄막 발사
+                    for (let i = 0; i < 12; i++) {
+                        let a = (Math.PI * 2 / 12) * i;
+                        bullets.push(new Bullet(this.x, this.y, a, this.atk, this, true));
+                    }
+                } else {
+                    // Standard shooting
+                    bullets.push(new Bullet(this.x, this.y, fireAngle, this.atk, this, false));
+                }
+            }
+
+            update() {
+                if (this.isDead) return;
+
+                // 어드민 탱크인 경우 끊임없이 자동 연속 발사
+                if (this.config.admin) {
+                    this.shoot();
+                }
+
+                if (this.isPlayer) {
+                    // Movement Controls (WASD)
+                    let dx = 0;
+                    let dy = 0;
+                    if (keys['w'] || keys['W']) dy -= 1;
+                    if (keys['s'] || keys['S']) dy += 1;
+                    if (keys['a'] || keys['A']) dx -= 1;
+                    if (keys['d'] || keys['D']) dx += 1;
+
+                    if (dx !== 0 || dy !== 0) {
+                        let moveAngle = Math.atan2(dy, dx);
+                        this.angle = moveAngle;
+                        let nextX = this.x + Math.cos(moveAngle) * this.speed;
+                        let nextY = this.y + Math.sin(moveAngle) * this.speed;
+
+                        if (!this.checkObstacleCollision(nextX, nextY)) {
+                            this.x = Math.max(20, Math.min(mapWidth - 20, nextX));
+                            this.y = Math.max(20, Math.min(mapHeight - 20, nextY));
+                        }
+                    }
+
+                    // Mouse Aim Turret Angle
+                    let screenX = this.x - (playerTank.x - canvas.width / 2);
+                    let screenY = this.y - (playerTank.y - canvas.height / 2);
+                    this.turretAngle = Math.atan2(mouseY - screenY, mouseX - screenX);
+
+                    // Directional Shooting Keys (I, J, K, L)
+                    if (keys['i'] || keys['I']) this.shoot(-Math.PI / 2);
+                    else if (keys['k'] || keys['K']) this.shoot(Math.PI / 2);
+                    else if (keys['j'] || keys['J']) this.shoot(Math.PI);
+                    else if (keys['l'] || keys['L']) this.shoot(0);
+
+                } else {
+                    // AI Behavior
+                    let target = playerTank && !playerTank.isDead ? playerTank : null;
+                    if (target) {
+                        let dist = Math.hypot(target.x - this.x, target.y - this.y);
+                        let angleToTarget = Math.atan2(target.y - this.y, target.x - this.x);
+                        this.turretAngle = angleToTarget;
+
+                        if (dist > 150) {
+                            let nextX = this.x + Math.cos(angleToTarget) * (this.speed * 0.7);
+                            let nextY = this.y + Math.sin(angleToTarget) * (this.speed * 0.7);
+                            if (!this.checkObstacleCollision(nextX, nextY)) {
+                                this.x = nextX;
+                                this.y = nextY;
+                                this.angle = angleToTarget;
+                            }
+                        }
+
+                        if (dist < 600) {
+                            this.shoot();
+                        }
+                    }
+                }
+            }
+
+            checkObstacleCollision(nx, ny) {
+                let r = this.getSize();
+                for (let ob of mapObstacles) {
+                    if (!ob.passable) {
+                        if (nx + r > ob.x && nx - r < ob.x + ob.w && ny + r > ob.y && ny - r < ob.y + ob.h) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+
+            draw(cameraX, cameraY) {
+                if (this.isDead) return;
+
+                let rx = this.x - cameraX;
+                let ry = this.y - cameraY;
+                let r = this.getSize();
+
+                // Check building cover hiding
+                let inCover = false;
+                for (let ob of mapObstacles) {
+                    if (ob.passable && this.x > ob.x && this.x < ob.x + ob.w && this.y > ob.y && this.y < ob.y + ob.h) {
+                        inCover = true;
+                        break;
+                    }
+                }
+
+                ctx.save();
+                ctx.translate(rx, ry);
+
+                if (inCover) {
+                    ctx.globalAlpha = this.isPlayer ? 0.4 : 0.05;
+                }
+
+                let bodyColor = this.team === 'blue' ? '#2563eb' : '#dc2626';
+                let strokeColor = '#ffffff';
+
+                if (this.config.secret) {
+                    bodyColor = this.config.color;
+                    strokeColor = '#facc15';
+                } else if (this.isPlayer && equippedTankSkin !== 'default') {
+                    const skinObj = TANK_SKINS.find(s => s.id === equippedTankSkin);
+                    if (skinObj && skinObj.color) {
+                        bodyColor = skinObj.color;
+                        strokeColor = skinObj.stroke || '#ffffff';
+                    }
+                }
+
+                // Tank Body
+                ctx.rotate(this.angle);
+                ctx.fillStyle = bodyColor;
+                ctx.fillRect(-r, -r * 0.8, r * 2, r * 1.6);
+                
+                ctx.fillStyle = '#1f2937';
+                ctx.fillRect(-r, -r * 0.9, r * 2, r * 0.3);
+                ctx.fillRect(-r, r * 0.6, r * 2, r * 0.3);
+
+                ctx.rotate(-this.angle);
+
+                // Tank Turret
+                ctx.rotate(this.turretAngle);
+                ctx.fillStyle = '#111827';
+                ctx.fillRect(0, -r * 0.2, r * 1.6, r * 0.4);
+
+                ctx.fillStyle = bodyColor;
+                ctx.beginPath();
+                ctx.arc(0, 0, r * 0.65, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = strokeColor;
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+
+                ctx.restore();
+
+                // Player Sight Crosshair Line
+                if (this.isPlayer) {
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(234, 179, 8, 0.4)';
+                    ctx.setLineDash([6, 6]);
+                    ctx.beginPath();
+                    ctx.moveTo(rx, ry);
+                    ctx.lineTo(rx + Math.cos(this.turretAngle) * 400, ry + Math.sin(this.turretAngle) * 400);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                // Name Tag & HP Bar
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 11px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(`Lv.${this.level} ${this.name}`, rx, ry - r - 12);
+
+                let hpPercent = Math.max(0, this.hp / this.maxHp);
+                ctx.fillStyle = '#374151';
+                ctx.fillRect(rx - 20, ry - r - 8, 40, 5);
+                ctx.fillStyle = hpPercent > 0.4 ? '#22c55e' : '#ef4444';
+                ctx.fillRect(rx - 20, ry - r - 8, 40 * hpPercent, 5);
+            }
+        }
+
+        function generateMap() {
+            mapObstacles = [];
+            
+            // 5 Enterable Cover Buildings
+            for (let i = 0; i < 5; i++) {
+                let w = 200 + Math.random() * 150;
+                let h = 200 + Math.random() * 150;
+                let x = 300 + Math.random() * (mapWidth - 600);
+                let y = 300 + Math.random() * (mapHeight - 600);
+                mapObstacles.push(new Obstacle(x, y, w, h, true));
+            }
+
+            // 15 Impassable Solid Walls
+            for (let i = 0; i < 15; i++) {
+                let w = 100 + Math.random() * 120;
+                let h = 100 + Math.random() * 120;
+                let x = 200 + Math.random() * (mapWidth - 400);
+                let y = 200 + Math.random() * (mapHeight - 400);
+                mapObstacles.push(new Obstacle(x, y, w, h, false));
+            }
+        }
+
+        function getRandomValidSpawn() {
+            let valid = false;
+            let sx = 0, sy = 0;
+            while (!valid) {
+                sx = 100 + Math.random() * (mapWidth - 200);
+                sy = 100 + Math.random() * (mapHeight - 200);
+                valid = true;
+                for (let ob of mapObstacles) {
+                    if (sx > ob.x - 30 && sx < ob.x + ob.w + 30 && sy > ob.y - 30 && sy < ob.y + ob.h + 30) {
+                        valid = false;
+                        break;
+                    }
+                }
+            }
+            return { x: sx, y: sy };
+        }
+
+        // AI bots are strictly restricted to standard tanks (no admin tanks)
+        function getRandomBotTankConfig() {
+            const normalTanks = TANK_DATABASE.filter(t => !t.admin);
+            return normalTanks[Math.floor(Math.random() * normalTanks.length)];
+        }
+
+        // Generate Level with exact specified probabilities
+        function getRandomLevel() {
+            let rand = Math.random();
+            if (rand < 0.0001) return 1000; // 0.01%
+            if (rand < 0.05) return 900;   // Rare
+            if (rand < 0.15) return 400;   // Somewhat rare
+            if (rand < 0.60) return 100;   // Common
+            return Math.floor(Math.random() * 50) + 1; // 1 ~ 50
+        }
+
+        function startGame() {
+            document.getElementById('lobbyOverlay').classList.add('hidden');
+            document.getElementById('inGameHUD').classList.remove('hidden');
+
+            gameActive = true;
+            bullets = [];
+            hexagons = [];
+            tanks = [];
+
+            generateMap();
+
+            // Player Spawn
+            let pSpawn = getRandomValidSpawn();
+            let pConfig = TANK_DATABASE.find(t => t.id === selectedTankId) || TANK_DATABASE[0];
+            playerTank = new Tank(pConfig.id, currentUser ? currentUser.nickname : 'Tanker', pSpawn.x, pSpawn.y, 'blue', true, pConfig, 1);
+            tanks.push(playerTank);
+
+            // Determine Teams/AIs
+            let teamCount = 1;
+            if (selectedTeamMode === '2v2') teamCount = 2;
+            else if (selectedTeamMode === '3v3') teamCount = 3;
+            else if (selectedTeamMode === '4v4') teamCount = 4;
+            else if (selectedTeamMode === '5v5') teamCount = 5;
+
+            gameMode = document.getElementById('gameModeSelect').value;
+
+            if (gameMode === 'mega') {
+                // MeGa Mode: 50-player FFA
+                for (let i = 0; i < 49; i++) {
+                    let sp = getRandomValidSpawn();
+                    let randomCfg = getRandomBotTankConfig();
+                    let lvl = getRandomLevel();
+                    tanks.push(new Tank(randomCfg.id, `Bot_${i+1}`, sp.x, sp.y, 'red', false, randomCfg, lvl));
+                }
+            } else {
+                // Team Matches
+                for (let i = 1; i < teamCount; i++) {
+                    let sp = getRandomValidSpawn();
+                    let cfg = getRandomBotTankConfig();
+                    tanks.push(new Tank(cfg.id, `Ally_${i}`, sp.x, sp.y, 'blue', false, cfg, getRandomLevel()));
+                }
+                for (let i = 0; i < teamCount; i++) {
+                    let sp = getRandomValidSpawn();
+                    let cfg = getRandomBotTankConfig();
+                    tanks.push(new Tank(cfg.id, `Enemy_${i+1}`, sp.x, sp.y, 'red', false, cfg, getRandomLevel()));
+                }
+            }
+
+            // Spawn Initial Hexagons
+            for (let i = 0; i < 30; i++) {
+                let sp = getRandomValidSpawn();
+                hexagons.push(new Hexagon(sp.x, sp.y));
+            }
+
+            // Setup Timer
+            gameTimer = 60;
+            if (gameTimerInterval) clearInterval(gameTimerInterval);
+            gameTimerInterval = setInterval(() => {
+                if (!gameActive) return;
+                if (gameMode === 'timed') {
+                    gameTimer--;
+                    let min = Math.floor(gameTimer / 60).toString().padStart(2, '0');
+                    let sec = (gameTimer % 60).toString().padStart(2, '0');
+                    document.getElementById('hudTimer').innerText = `${min}:${sec}`;
+                    if (gameTimer <= 0) {
+                        returnToLobby();
+                    }
+                } else {
+                    document.getElementById('hudTimer').innerText = '∞';
+                }
+            }, 1000);
+
+            // Drop 20 Hexagons every 10 seconds
+            if (coinDropInterval) clearInterval(coinDropInterval);
+            coinDropInterval = setInterval(() => {
+                if (!gameActive) return;
+                for (let i = 0; i < 20; i++) {
+                    let sp = getRandomValidSpawn();
+                    hexagons.push(new Hexagon(sp.x, sp.y));
+                }
+            }, 10000);
+
+            updateHUD();
+        }
+
+        function returnToLobby() {
+            gameActive = false;
+            if (gameTimerInterval) clearInterval(gameTimerInterval);
+            if (coinDropInterval) clearInterval(coinDropInterval);
+
+            if (currentUser && window.saveLeaderboardScore) {
+                window.saveLeaderboardScore(currentUser.nickname, currentUser.kills);
+            }
+
+            document.getElementById('inGameHUD').classList.add('hidden');
+            document.getElementById('lobbyOverlay').classList.remove('hidden');
+            updateUserUI();
+        }
+
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (gameActive && playerTank) {
+                let cameraX = playerTank.x - canvas.width / 2;
+                let cameraY = playerTank.y - canvas.height / 2;
+
+                // Draw Grid Background
+                ctx.strokeStyle = '#111827';
+                ctx.lineWidth = 1;
+                for (let x = -cameraX % 100; x < canvas.width; x += 100) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, canvas.height);
+                    ctx.stroke();
+                }
+                for (let y = -cameraY % 100; y < canvas.height; y += 100) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.stroke();
+                }
+
+                // Update & Draw Obstacles
+                mapObstacles.forEach(ob => ob.draw(cameraX, cameraY));
+
+                // Update & Draw Hexagons
+                hexagons.forEach(hex => hex.draw(cameraX, cameraY));
+
+                // Update & Draw Tanks
+                tanks.forEach(tank => {
+                    tank.update();
+                    tank.draw(cameraX, cameraY);
+                });
+
+                // Update & Draw Bullets
+                for (let i = bullets.length - 1; i >= 0; i--) {
+                    let b = bullets[i];
+                    b.update();
+                    b.draw(cameraX, cameraY);
+
+                    if (b.isDead) {
+                        bullets.splice(i, 1);
+                        continue;
+                    }
+
+                    // Bullet vs Bullet Collision System
+                    for (let j = i - 1; j >= 0; j--) {
+                        let b2 = bullets[j];
+                        if (b2.isDead || b.owner === b2.owner) continue;
+
+                        if (Math.hypot(b.x - b2.x, b.y - b2.y) < b.radius + b2.radius) {
+                            if (b.isTriangle) {
+                                b.hp--;
+                                b2.isDead = true;
+                                if (b.hp <= 0) b.isDead = true;
+                            } else if (b2.isTriangle) {
+                                b2.hp--;
+                                b.isDead = true;
+                                if (b2.hp <= 0) b2.isDead = true;
+                            } else {
+                                // Normal bullets destroy each other
+                                b.isDead = true;
+                                b2.isDead = true;
+                            }
+                            break;
+                        }
+                    }
+
+                    if (b.isDead) continue;
+
+                    // Bullet vs Hexagon Collision
+                    for (let hex of hexagons) {
+                        if (hex.isDead) continue;
+                        if (Math.hypot(b.x - hex.x, b.y - hex.y) < b.radius + hex.size) {
+                            hex.hp -= b.damage;
+                            b.isDead = true;
+                            if (hex.hp <= 0) {
+                                hex.isDead = true;
+                                if (b.owner) {
+                                    b.owner.gainExp(50);
+                                    if (b.owner.isPlayer && currentUser) {
+                                        currentUser.coins += 5;
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                    }
+
+                    if (b.isDead) continue;
+
+                    // Bullet vs Tank Collision
+                    for (let tank of tanks) {
+                        if (tank.isDead || tank === b.owner) continue;
+                        if (Math.hypot(b.x - tank.x, b.y - tank.y) < b.radius + tank.getSize()) {
+                            tank.hp -= b.damage;
+                            b.isDead = true;
+
+                            if (tank.hp <= 0) {
+                                tank.isDead = true;
+                                if (b.owner) {
+                                    b.owner.kills++;
+                                    let expGained = Math.floor(tank.maxExp * 0.8);
+                                    b.owner.gainExp(expGained);
+
+                                    if (b.owner.isPlayer && currentUser) {
+                                        currentUser.kills++;
+                                        currentUser.coins += 50;
+                                        if (window.saveLeaderboardScore) {
+                                            window.saveLeaderboardScore(currentUser.nickname, currentUser.kills);
+                                        }
+                                    }
+                                }
+
+                                // 적이 죽으면 1초 후 무작위 다른 위치에 새로운 적 전차 생성
+                                if (!tank.isPlayer) {
+                                    setTimeout(() => {
+                                        if (!gameActive) return;
+                                        let sp = getRandomValidSpawn();
+                                        let randomCfg = getRandomBotTankConfig();
+                                        let lvl = getRandomLevel();
+                                        tanks.push(new Tank(randomCfg.id, tank.name, sp.x, sp.y, tank.team, false, randomCfg, lvl));
+                                    }, 1000);
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                // Render MiniMap
+                drawMiniMap();
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function drawMiniMap() {
+            miniCtx.clearRect(0, 0, 128, 128);
+            miniCtx.fillStyle = '#000000';
+            miniCtx.fillRect(0, 0, 128, 128);
+
+            let scaleX = 128 / mapWidth;
+            let scaleY = 128 / mapHeight;
+
+            tanks.forEach(tank => {
+                if (tank.isDead) return;
+                miniCtx.fillStyle = tank.isPlayer ? '#facc15' : tank.team === 'blue' ? '#3b82f6' : '#ef4444';
+                miniCtx.beginPath();
+                miniCtx.arc(tank.x * scaleX, tank.y * scaleY, tank.isPlayer ? 4 : 2.5, 0, Math.PI * 2);
+                miniCtx.fill();
+            });
+        }
+
+        function updateHUD() {
+            if (!playerTank) return;
+            document.getElementById('hudPlayerName').innerText = playerTank.name;
+            document.getElementById('hudTankName').innerText = playerTank.config.name;
+            document.getElementById('hudHpBar').style.width = `${Math.max(0, (playerTank.hp / playerTank.maxHp) * 100)}%`;
+            document.getElementById('hudHpText').innerText = `${Math.max(0, Math.floor(playerTank.hp))} / ${playerTank.maxHp}`;
+            document.getElementById('hudExpBar').style.width = `${Math.max(0, (playerTank.exp / playerTank.maxExp) * 100)}%`;
+            document.getElementById('hudExpText').innerText = playerTank.exp;
+            document.getElementById('hudMaxExpText').innerText = playerTank.maxExp;
+            document.getElementById('hudLevelText').innerText = playerTank.level;
+            document.getElementById('hudKills').innerText = `${playerTank.kills} Kills`;
+
+            // Scoreboard
+            const scoreList = document.getElementById('hudScoreList');
+            scoreList.innerHTML = '';
+            tanks.slice(0, 5).forEach(t => {
+                const item = document.createElement('div');
+                item.className = 'flex justify-between items-center';
+                item.innerHTML = `
+                    <span class="${t.isPlayer ? 'text-yellow-400 font-bold' : 'text-gray-300'}">${t.name}</span>
+                    <span>${t.kills} K</span>
+                `;
+                scoreList.appendChild(item);
+            });
+        }
+
+        window.addEventListener('keydown', e => {
+            keys[e.key] = true;
+            if (e.key === 'Enter') {
+                if (gameActive) {
+                    returnToLobby();
+                } else {
+                    startGame();
+                }
+            }
+            if (e.key === ' ' && gameActive && playerTank) {
+                playerTank.shoot();
+            }
+        });
+
+        window.addEventListener('keyup', e => {
+            keys[e.key] = false;
+        });
+
+        window.addEventListener('mousemove', e => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+
+        window.addEventListener('mousedown', e => {
+            if (gameActive && playerTank) {
+                playerTank.shoot();
+            }
+        });
+
+        function initTankGrid() {
+            const grid = document.getElementById('tankGrid');
+            grid.innerHTML = '';
+
+            TANK_DATABASE.forEach(tank => {
+                if (tank.secret && !unlockedSecretAdmin) return;
+
+                const card = document.createElement('button');
+                card.onclick = () => selectTank(tank.id);
+                card.className = `p-2.5 rounded-xl border transition text-left flex flex-col justify-between h-20 ${selectedTankId === tank.id ? 'bg-yellow-500/20 border-yellow-400' : 'bg-gray-800/80 border-gray-700 hover:bg-gray-700'}`;
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-center w-full">
+                        <span class="font-bold text-xs text-white truncate">${tank.name}</span>
+                        <i class="fa-solid ${tank.icon} text-yellow-400 text-xs"></i>
+                    </div>
+                    <div class="text-[10px] text-gray-400 line-clamp-1">${tank.tag}</div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function selectTank(id) {
+            selectedTankId = id;
+            const tank = TANK_DATABASE.find(t => t.id === id);
+            if (!tank) return;
+
+            document.getElementById('selectedTankType').innerText = tank.name;
+            document.getElementById('tankInfoName').innerText = tank.name;
+            document.getElementById('tankInfoTag').innerText = `"${tank.tag}"`;
+            document.getElementById('tankInfoDesc').innerText = tank.desc;
+            document.getElementById('statAtk').innerText = tank.atk;
+            document.getElementById('statHp').innerText = tank.hp;
+            document.getElementById('statSpd').innerText = tank.speed;
+            document.getElementById('statReload').innerText = `${tank.reload}s`;
+            document.getElementById('tankInfoIcon').className = `fa-solid ${tank.icon}`;
+
+            initTankGrid();
+        }
+
+        function setTeamMode(mode) {
+            selectedTeamMode = mode;
+            document.querySelectorAll('.team-btn').forEach(btn => {
+                btn.className = 'team-btn bg-gray-800 text-gray-300 hover:bg-gray-700 py-1.5 text-xs rounded border border-gray-700';
+            });
+            event.target.className = 'team-btn bg-yellow-500 text-black font-bold py-1.5 text-xs rounded border border-yellow-400';
+            document.getElementById('hudModeTitle').innerText = `${mode} MATCH`;
+        }
+
+        // Account System
+        function showAccountError(msg) {
+            const errDiv = document.getElementById('accMsg');
+            if (errDiv) {
+                errDiv.innerText = msg;
+                errDiv.classList.remove('hidden');
+            }
+        }
+
+        function handleLogin() {
+            const nick = document.getElementById('accNickname').value.trim();
+            const pass = document.getElementById('accPassword').value.trim();
+            
+            if (!nick) {
+                showAccountError('닉네임을 입력해주세요.');
+                return;
+            }
+
+            let acc = accountsDB.find(a => a.nickname === nick);
+            if (!acc) {
+                showAccountError('존재하지 않는 계정입니다. 계정 생성을 눌러주세요.');
+                return;
+            }
+
+            if (pass && acc.password && acc.password !== pass) {
+                showAccountError('비밀번호가 일치하지 않습니다.');
+                return;
+            }
+
+            currentUser = acc;
+            document.getElementById('accountModal').classList.add('hidden');
+            document.getElementById('accMsg').classList.add('hidden');
+            updateUserUI();
+
+            if (window.saveLeaderboardScore) {
+                window.saveLeaderboardScore(currentUser.nickname, currentUser.kills);
+            }
+        }
+
+        function handleRegister() {
+            const nick = document.getElementById('accNickname').value.trim();
+            const pass = document.getElementById('accPassword').value.trim();
+
+            if (!nick) {
+                showAccountError('생성할 닉네임을 입력해주세요.');
+                return;
+            }
+
+            let existing = accountsDB.find(a => a.nickname === nick);
+            if (existing) {
+                showAccountError('이미 존재하는 닉네임입니다. 다른 닉네임을 사용하세요.');
+                return;
+            }
+
+            const newAcc = {
+                nickname: nick,
+                password: pass || '1234',
+                coins: 100,
+                kills: 0,
+                chests: 0,
+                upgrades: { atk: 0, hp: 0, speed: 0 }
+            };
+
+            accountsDB.push(newAcc);
+            currentUser = newAcc;
+            document.getElementById('accountModal').classList.add('hidden');
+            document.getElementById('accMsg').classList.add('hidden');
+            updateUserUI();
+
+            if (window.saveLeaderboardScore) {
+                window.saveLeaderboardScore(currentUser.nickname, currentUser.kills);
+            }
+        }
+        function openLeaderboard() {
+            document.getElementById('leaderboardModal').classList.remove('hidden');
+            updateLeaderboardUI();
+        }
+
+        function updateLeaderboardUI() {
+            const list = document.getElementById('leaderboardList');
+            if (!list) return;
+            list.innerHTML = '';
+
+            // Combine real-time server database with local account data
+            let combinedMap = new Map();
+
+            // Load default/local bot accounts
+            accountsDB.forEach(acc => {
+                combinedMap.set(acc.nickname, { nickname: acc.nickname, kills: acc.kills });
+            });
+
+            // Override/add real-time scores from shared server database
+            if (window.globalLeaderboardData && window.globalLeaderboardData.length > 0) {
+                window.globalLeaderboardData.forEach(item => {
+                    if (item.nickname) {
+                        combinedMap.set(item.nickname, { nickname: item.nickname, kills: item.kills || 0 });
+                    }
+                });
+            }
+
+            // Ensure current active user stats are up to date
+            if (currentUser) {
+                const existing = combinedMap.get(currentUser.nickname) || {};
+                combinedMap.set(currentUser.nickname, {
+                    nickname: currentUser.nickname,
+                    kills: Math.max(existing.kills || 0, currentUser.kills)
+                });
+            }
+
+            let sorted = Array.from(combinedMap.values());
+            // Sort by kills descending
+            sorted.sort((a, b) => (b.kills || 0) - (a.kills || 0));
+
+            sorted.forEach((acc, index) => {
+                const isCurrent = currentUser && acc.nickname === currentUser.nickname;
+                const item = document.createElement('div');
+                
+                let rankBadge = `${index + 1}.`;
+                if (index === 0) rankBadge = '🥇 1위';
+                else if (index === 1) rankBadge = '🥈 2위';
+                else if (index === 2) rankBadge = '🥉 3위';
+
+                item.className = `flex justify-between items-center ${isCurrent ? 'bg-yellow-500/20 border border-yellow-500/50' : 'bg-gray-800'} p-2.5 rounded-xl text-xs`;
+                item.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span class="font-orbitron font-bold ${index < 3 ? 'text-yellow-400' : 'text-gray-400'}">${rankBadge}</span>
+                        <span class="${isCurrent ? 'text-yellow-300 font-bold' : 'text-gray-200'}">${acc.nickname} ${isCurrent ? '<span class="text-[10px] text-yellow-500">(나)</span>' : ''}</span>
+                    </div>
+                    <span class="text-yellow-400 font-bold font-orbitron">${acc.kills || 0} Kills</span>
+                `;
+                list.appendChild(item);
+            });
+        }
+        window.updateLeaderboardUI = updateLeaderboardUI;
+
+        function closeLeaderboard() {
+            document.getElementById('leaderboardModal').classList.hidden = true;
+            document.getElementById('leaderboardModal').classList.add('hidden');
+        }
+        }
+
+        function renderShopSkins() {
+            const grid = document.getElementById('tankSkinGrid');
+            grid.innerHTML = '';
+            TANK_SKINS.forEach(skin => {
+                const isUnlocked = unlockedTankSkins.includes(skin.id);
+                const isEquipped = equippedTankSkin === skin.id;
+
+                const card = document.createElement('div');
+                card.className = `bg-gray-800/80 border ${isEquipped ? 'border-yellow-400 bg-yellow-500/10' : 'border-gray-700'} p-3.5 rounded-xl flex justify-between items-center`;
+                card.innerHTML = `
+                    <div>
+                        <div class="font-bold text-sm text-white">${skin.name}</div>
+                        <div class="text-[11px] text-gray-400 mt-0.5">가격: ${skin.cost === 0 ? '기본' : skin.cost + ' 코인'}</div>
+                    </div>
+                    <div>
+                        ${isEquipped ? `
+                            <span class="text-xs bg-yellow-500/20 border border-yellow-500/50 text-yellow-400 px-3 py-1.5 rounded-lg font-bold">장착 중</span>
+                        ` : isUnlocked ? `
+                            <button onclick="equipTankSkin('${skin.id}')" class="text-xs bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-3 py-1.5 rounded-lg transition">장착</button>
+                        ` : `
+                            <button onclick="buyTankSkin('${skin.id}', ${skin.cost})" class="text-xs bg-yellow-500 hover:bg-yellow-400 text-black font-bold px-3 py-1.5 rounded-lg transition">구매 (${skin.cost}💰)</button>
+                        `}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function renderShopBullets() {
+            const grid = document.getElementById('bulletSkinGrid');
+            grid.innerHTML = '';
+            BULLET_SKINS.forEach(skin => {
+                const isUnlocked = unlockedBulletSkins.includes(skin.id);
+                const isEquipped = bulletSkin === skin.id;
+
+                const card = document.createElement('div');
+                card.className = `bg-gray-800/80 border ${isEquipped ? 'border-cyan-400 bg-cyan-500/10' : 'border-gray-700'} p-3.5 rounded-xl flex justify-between items-center`;
+                card.innerHTML = `
+                    <div>
+                        <div class="font-bold text-sm text-white">${skin.name}</div>
+                        <div class="text-[11px] text-gray-400 mt-0.5">${skin.desc}</div>
+                    </div>
+                    <div>
+                        ${isEquipped ? `
+                            <span class="text-xs bg-cyan-500/20 border border-cyan-500/50 text-cyan-400 px-3 py-1.5 rounded-lg font-bold">장착 중</span>
+                        ` : isUnlocked ? `
+                            <button onclick="equipBulletSkin('${skin.id}')" class="text-xs bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-3 py-1.5 rounded-lg transition">장착</button>
+                        ` : `
+                            <button onclick="buyBulletSkin('${skin.id}', ${skin.cost})" class="text-xs bg-yellow-500 hover:bg-yellow-400 text-black font-bold px-3 py-1.5 rounded-lg transition">구매 (${skin.cost}💰)</button>
+                        `}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function buyTankSkin(id, cost) {
+            if (!currentUser || currentUser.coins < cost) return;
+            currentUser.coins -= cost;
+            unlockedTankSkins.push(id);
+            equippedTankSkin = id;
+            updateUserUI();
+            renderShopSkins();
+        }
+
+        function equipTankSkin(id) {
+            equippedTankSkin = id;
+            renderShopSkins();
+        }
+
+        function buyBulletSkin(id, cost) {
+            if (!currentUser || currentUser.coins < cost) return;
+            currentUser.coins -= cost;
+            unlockedBulletSkins.push(id);
+            bulletSkin = id;
+            updateUserUI();
+            renderShopBullets();
+        }
+
+        function equipBulletSkin(id) {
+            bulletSkin = id;
+            renderShopBullets();
+        }
+
+        function openChest() {
+            if (!currentUser || currentUser.coins < 200) return;
+            currentUser.coins -= 200;
+            let randomTank = TANK_DATABASE[Math.floor(Math.random() * 15)];
+            currentUser.chests++;
+            updateUserUI();
+        }
+
+        function applyShopCheatCode() {
+            const input = document.getElementById('shopCheatCodeInput').value.trim().toUpperCase();
+            const msg = document.getElementById('shopCodeMsg');
+            msg.classList.remove('hidden');
+
+            if (input === 'ADMINISWW') {
+                unlockedSecretAdmin = true;
+                initTankGrid();
+                msg.className = 'text-xs mt-2 text-green-400 font-bold';
+                msg.innerText = '👑 비밀 어드민 탱크 2종이 해금되었습니다!';
+            } else {
+                msg.className = 'text-xs mt-2 text-red-400 font-bold';
+                msg.innerText = '❌ 코드가 일치하지 않습니다.';
+            }
+        }
+
+        function upgradeStat(stat) {
+            if (!currentUser) return;
+            const msg = document.getElementById('codeResultMsg');
+            let success = false;
+
+            if (stat === 'atk' && currentUser.coins >= 100) {
+                currentUser.coins -= 100;
+                currentUser.upgrades.atk += 5;
+                success = true;
+            } else if (stat === 'hp' && currentUser.coins >= 100) {
+                currentUser.coins -= 100;
+                currentUser.upgrades.hp += 100;
+                success = true;
+            } else if (stat === 'speed' && currentUser.coins >= 150) {
+                currentUser.coins -= 150;
+                currentUser.upgrades.speed += 0.2;
+                success = true;
+            }
+
+            if (success) {
+                updateUserUI();
+                if (msg) {
+                    msg.classList.remove('hidden');
+                    msg.className = 'text-xs mt-2 text-green-400 font-bold';
+                    msg.innerText = '✨ 스탯 업그레이드 완료!';
+                }
+            } else {
+                if (msg) {
+                    msg.classList.remove('hidden');
+                    msg.className = 'text-xs mt-2 text-red-400 font-bold';
+                    msg.innerText = '❌ 코인이 부족합니다!';
+                }
+            }
+        }
+
+        function resizeCanvas() {
+            if (canvas) {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            if (miniCanvas) {
+                miniCanvas.width = 128;
+                miniCanvas.height = 128;
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        window.onload = function() {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            miniCanvas = document.getElementById('miniMapCanvas');
+            miniCtx = miniCanvas.getContext('2d');
+
+            resizeCanvas();
+            initTankGrid();
+            selectTank('k2');
+            gameLoop();
+        };
+    </script>
+</body>
+</html>
